@@ -1,14 +1,11 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class GeneratedTask(BaseModel):
     titulo: str
     descripcion: str
-    priority: str
-    estimatedHours: float
-    suggestedDeadlineOffsetDays: int
-    source: str
+    tiempoEstimado: Optional[float] = None
 
 
 class GenerateTasksResponse(BaseModel):
