@@ -18,3 +18,4 @@ class GenerateTasksRequest(BaseModel):
     projectId: str
     projectContext: ProjectContext
     documents: List[DocumentInput]
+    maxHours: Optional[float] = None

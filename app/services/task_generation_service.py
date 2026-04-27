@@ -10,11 +10,13 @@ class TaskGenerationService:
         content = "\n\n".join(
             f"[{doc.type}]\n{doc.content}" for doc in request.documents
         )
-        tasks = generate_tasks_with_openai(content)
+        tasks = generate_tasks_with_openai(content, request.maxHours)
         return GenerateTasksResponse(tasks=tasks)
 
     def generate_tasks_from_kafka(self, request_dict: dict) -> dict:
         documents = request_dict.get("documents", [])
+        max_hours = request_dict.get("maxHours")
+
         parts = []
 
         for doc in documents:
@@ -36,7 +38,8 @@ class TaskGenerationService:
             if content:
                 parts.append(f"[{doc_type}]\n{content}")
 
-        tasks = generate_tasks_with_openai("\n\n".join(parts))
+        tasks = generate_tasks_with_openai("\n\n".join(parts), max_hours)
+
         return {
             "projectId": request_dict.get("projectId"),
             "tasks": [t.model_dump() for t in tasks]
