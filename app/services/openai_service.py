@@ -1,21 +1,14 @@
 import json
+from pathlib import Path
+
 from openai import OpenAI
 from app.core.config import settings
 from app.models.response_models import GeneratedTask
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-SYSTEM_PROMPT = """
-Eres un experto en gestión de proyectos de software.
-Tu tarea es generar tareas de backlog a partir de documentos de requerimientos.
-Responde ÚNICAMENTE con un JSON array. Sin texto adicional, sin markdown, sin bloques de código.
-Schema de cada tarea:
-{
-  "titulo": "string (máximo 120 caracteres)",
-  "descripcion": "string (máximo 500 caracteres)",
-  "tiempoEstimado": float o null (horas de trabajo estimadas)
-}
-"""
+SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "task_generation_system_prompt.md"
+SYSTEM_PROMPT = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
 
 # Fix 1: truncar a 6000 chars para no saturar el contexto
 MAX_CONTENT_CHARS = 6000
