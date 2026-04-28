@@ -10,3 +10,20 @@ class GeneratedTask(BaseModel):
 
 class GenerateTasksResponse(BaseModel):
     tasks: List[GeneratedTask]
+
+
+class DuplicateCandidate(BaseModel):
+    taskAId: str
+    taskBId: str
+    taskATitle: str
+    taskBTitle: str
+    similarityScore: float
+    reason: Optional[str] = None
+
+
+class DuplicateDetectionResponse(BaseModel):
+    runId: str
+    projectId: str
+    status: str
+    errorMessage: Optional[str] = None
+    duplicates: List[DuplicateCandidate]

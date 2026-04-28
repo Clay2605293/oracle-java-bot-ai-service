@@ -13,3 +13,7 @@ class AiKafkaProducer:
     def send_task_generation_response(self, message: dict):
         self.producer.send('ai-task-generation-response', message)
         self.producer.flush()
+
+    def send_duplicate_detection_response(self, message: dict):
+        self.producer.send('ai-duplicate-detection-response', message)
+        self.producer.flush()

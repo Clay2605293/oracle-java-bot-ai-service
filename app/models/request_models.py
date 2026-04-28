@@ -19,3 +19,16 @@ class GenerateTasksRequest(BaseModel):
     projectContext: ProjectContext
     documents: List[DocumentInput]
     maxHours: Optional[float] = None
+
+
+class DuplicateDetectionTask(BaseModel):
+    taskId: str
+    titulo: str
+    descripcion: Optional[str] = None
+
+
+class DuplicateDetectionRequest(BaseModel):
+    runId: str
+    projectId: str
+    threshold: Optional[float] = 0.88
+    tasks: List[DuplicateDetectionTask]
