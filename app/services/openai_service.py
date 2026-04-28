@@ -45,7 +45,7 @@ def generate_tasks_with_openai(
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.3,
-        max_completion_tokens=2000
+        max_completion_tokens=16384
     )
 
     raw = response.choices[0].message.content.strip()
@@ -75,7 +75,7 @@ def generate_tasks_with_openai(
             tiempoEstimado=parse_tiempo_estimado(t.get("tiempoEstimado"))
         ))
 
-    tasks = enforce_total_hours_limit(tasks, normalized_max_hours)
+    tasks = enforce_task_hours_limit(tasks, normalized_max_hours)
 
     total_hours = sum(
         task.tiempoEstimado or 0
@@ -83,8 +83,9 @@ def generate_tasks_with_openai(
     )
 
     print(
-        f"⏱️ Generated {len(tasks)} tasks with total estimated hours: {total_hours}"
-        + (f" / maxHours: {normalized_max_hours}" if normalized_max_hours else ""),
+        f"⏱️ Generated {len(tasks)} tasks. "
+        f"Total estimated hours: {total_hours}"
+        + (f". Max hours per task: {normalized_max_hours}" if normalized_max_hours else ""),
         flush=True
     )
 
@@ -173,14 +174,23 @@ def detect_duplicate_tasks_with_openai(
 
 def build_user_prompt(content: str, max_hours: Optional[float]) -> str:
     if max_hours is None:
-        return f"Genera tareas de backlog para este proyecto:\n\n{content}"
+        return (
+            "Genera tareas de backlog para este proyecto.\n\n"
+            "Prioriza tareas pequeñas, accionables, verificables y sin duplicados.\n\n"
+            f"Documento del proyecto:\n\n{content}"
+        )
 
     return (
         f"Genera tareas de backlog para este proyecto.\n\n"
         f"Restricción obligatoria:\n"
-        f"- La suma total de tiempoEstimado de todas las tareas generadas no debe exceder {max_hours} horas.\n"
-        f"- Si no puedes cubrir todo el documento dentro de ese límite, prioriza las tareas más importantes.\n"
-        f"- No generes tareas adicionales si hacerlo supera el límite total de horas.\n\n"
+        f"- maxHours representa el máximo de horas permitido por tarea individual.\n"
+        f"- Ninguna tarea generada puede tener tiempoEstimado mayor a {max_hours} horas.\n"
+        f"- NO interpretes {max_hours} como el total de horas del backlog.\n"
+        f"- NO limites la suma total de horas de todas las tareas.\n"
+        f"- Si una actividad requiere más de {max_hours} horas, divídela en varias tareas más pequeñas.\n"
+        f"- Prefiere granularidad alta: tareas de 1 a {max_hours} horas, accionables y verificables.\n"
+        f"- Genera más tareas si eso permite representar mejor el trabajo del documento.\n"
+        f"- Evita tareas duplicadas o demasiado similares.\n\n"
         f"Documento del proyecto:\n\n{content}"
     )
 
@@ -297,29 +307,27 @@ def parse_similarity_score(value) -> float:
     return parsed
 
 
-def enforce_total_hours_limit(
+def enforce_task_hours_limit(
     tasks: list[GeneratedTask],
     max_hours: Optional[float]
 ) -> list[GeneratedTask]:
     if max_hours is None:
         return tasks
 
-    accepted_tasks = []
-    accumulated_hours = 0.0
+    corrected_tasks = []
 
     for task in tasks:
         estimated = task.tiempoEstimado
 
-        if estimated is None:
-            continue
-
-        if accumulated_hours + estimated <= max_hours:
-            accepted_tasks.append(task)
-            accumulated_hours += estimated
-        else:
+        if estimated is not None and estimated > max_hours:
             print(
-                f"⚠️ Skipping task because it exceeds maxHours: {task.titulo} ({estimated}h)",
+                f"⚠️ Capping task estimate because it exceeds maxHours per task: "
+                f"{task.titulo} ({estimated}h -> {max_hours}h)",
                 flush=True
             )
 
-    return accepted_tasks
+            task.tiempoEstimado = max_hours
+
+        corrected_tasks.append(task)
+
+    return corrected_tasks

@@ -14,6 +14,8 @@ Schema de cada tarea:
 Reglas:
 - Cada tarea debe representar trabajo accionable y verificable.
 - No inventes fechas, sprint, prioridad, responsable ni estado.
-- Si el usuario indica un límite máximo de horas, la suma total de tiempoEstimado de todas las tareas generadas no debe exceder ese límite.
-- Si el límite de horas es bajo, genera menos tareas y prioriza las más importantes.
+- Si el usuario indica un límite máximo de horas, ese límite aplica a cada tarea individual, no a la suma total del backlog.
+- Ninguna tarea puede tener tiempoEstimado mayor a ese límite.
+- Si una actividad supera ese límite, divídela en varias tareas más pequeñas.
+- Si el límite de horas es bajo, genera más tareas, más pequeñas.
 - Evita tareas duplicadas o demasiado similares.
