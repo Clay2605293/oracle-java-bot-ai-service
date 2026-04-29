@@ -3,6 +3,7 @@ from kafka import KafkaConsumer
 
 from app.services.task_generation_service import TaskGenerationService
 from app.services.duplicate_detection_service import DuplicateDetectionService
+from app.services.semantic_duplicate_detection_service import SemanticDuplicateDetectionService
 from app.services.kafka_producer import AiKafkaProducer
 
 
@@ -12,6 +13,7 @@ class AiKafkaConsumer:
         self.consumer = KafkaConsumer(
             'ai-task-generation-request',
             'ai-duplicate-detection-request',
+            'ai-semantic-duplicate-detection-request',
             bootstrap_servers='kafka:29092',
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             auto_offset_reset='earliest',
@@ -21,12 +23,16 @@ class AiKafkaConsumer:
 
         self.task_service = TaskGenerationService()
         self.duplicate_detection_service = DuplicateDetectionService()
+        self.semantic_duplicate_detection_service = SemanticDuplicateDetectionService()
         self.producer = AiKafkaProducer()
 
     def start(self):
         print("🔥 AI Kafka Consumer started...", flush=True)
         print(
-            "👂 Listening topics: ai-task-generation-request, ai-duplicate-detection-request",
+            "👂 Listening topics: "
+            "ai-task-generation-request, "
+            "ai-duplicate-detection-request, "
+            "ai-semantic-duplicate-detection-request",
             flush=True
         )
 
@@ -42,6 +48,9 @@ class AiKafkaConsumer:
 
                 elif message.topic == "ai-duplicate-detection-request":
                     self.handle_duplicate_detection_request(request)
+
+                elif message.topic == "ai-semantic-duplicate-detection-request":
+                    self.handle_semantic_duplicate_detection_request(request)
 
                 else:
                     print(f"⚠️ Unknown topic ignored: {message.topic}", flush=True)
@@ -66,3 +75,12 @@ class AiKafkaConsumer:
         self.producer.send_duplicate_detection_response(response)
 
         print("📤 Sent duplicate detection response to Kafka", flush=True)
+
+    def handle_semantic_duplicate_detection_request(self, request: dict):
+        response = self.semantic_duplicate_detection_service.detect_semantic_duplicates_from_kafka(request)
+
+        print("🧠 Semantic duplicate detection response:", response, flush=True)
+
+        self.producer.send_semantic_duplicate_detection_response(response)
+
+        print("📤 Sent semantic duplicate detection response to Kafka", flush=True)

@@ -17,3 +17,7 @@ class AiKafkaProducer:
     def send_duplicate_detection_response(self, message: dict):
         self.producer.send('ai-duplicate-detection-response', message)
         self.producer.flush()
+
+    def send_semantic_duplicate_detection_response(self, message: dict):
+        self.producer.send('ai-semantic-duplicate-detection-response', message)
+        self.producer.flush()
