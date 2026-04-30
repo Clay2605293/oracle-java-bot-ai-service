@@ -21,3 +21,7 @@ class AiKafkaProducer:
     def send_semantic_duplicate_detection_response(self, message: dict):
         self.producer.send('ai-semantic-duplicate-detection-response', message)
         self.producer.flush()
+
+    def send_task_embedding_response(self, message: dict):
+        self.producer.send('ai-task-embedding-response', message)
+        self.producer.flush()
