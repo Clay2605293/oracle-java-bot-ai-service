@@ -1,12 +1,24 @@
 import json
+import os
+
 from kafka import KafkaProducer
 
 
 class AiKafkaProducer:
 
     def __init__(self):
+        kafka_bootstrap_servers = os.getenv(
+            "KAFKA_BOOTSTRAP_SERVERS",
+            "kafka:9092"
+        )
+
+        print(
+            f"🔌 AI Kafka Producer connecting to: {kafka_bootstrap_servers}",
+            flush=True
+        )
+
         self.producer = KafkaProducer(
-            bootstrap_servers='kafka:29092',
+            bootstrap_servers=kafka_bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8')
         )
 

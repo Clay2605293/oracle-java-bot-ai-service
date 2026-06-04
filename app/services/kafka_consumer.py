@@ -1,4 +1,6 @@
 import json
+import os
+
 from kafka import KafkaConsumer
 
 from app.services.task_generation_service import TaskGenerationService
@@ -11,12 +13,22 @@ from app.services.kafka_producer import AiKafkaProducer
 class AiKafkaConsumer:
 
     def __init__(self):
+        kafka_bootstrap_servers = os.getenv(
+            "KAFKA_BOOTSTRAP_SERVERS",
+            "kafka:9092"
+        )
+
+        print(
+            f"🔌 AI Kafka Consumer connecting to: {kafka_bootstrap_servers}",
+            flush=True
+        )
+
         self.consumer = KafkaConsumer(
             'ai-task-generation-request',
             'ai-duplicate-detection-request',
             'ai-semantic-duplicate-detection-request',
             'ai-task-embedding-request',
-            bootstrap_servers='kafka:29092',
+            bootstrap_servers=kafka_bootstrap_servers,
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
             auto_offset_reset='earliest',
             group_id='ai-service-group',
