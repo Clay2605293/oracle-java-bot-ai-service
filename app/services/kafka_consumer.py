@@ -1,8 +1,8 @@
 import json
-import os
 
 from kafka import KafkaConsumer
 
+from app.core.config import settings
 from app.services.task_generation_service import TaskGenerationService
 from app.services.duplicate_detection_service import DuplicateDetectionService
 from app.services.semantic_duplicate_detection_service import SemanticDuplicateDetectionService
@@ -13,10 +13,7 @@ from app.services.kafka_producer import AiKafkaProducer
 class AiKafkaConsumer:
 
     def __init__(self):
-        kafka_bootstrap_servers = os.getenv(
-            "KAFKA_BOOTSTRAP_SERVERS",
-            "kafka:9092"
-        )
+        kafka_bootstrap_servers = settings.KAFKA_BOOTSTRAP_SERVERS
 
         print(
             f"🔌 AI Kafka Consumer connecting to: {kafka_bootstrap_servers}",

@@ -1,16 +1,14 @@
 import json
-import os
 
 from kafka import KafkaProducer
+
+from app.core.config import settings
 
 
 class AiKafkaProducer:
 
     def __init__(self):
-        kafka_bootstrap_servers = os.getenv(
-            "KAFKA_BOOTSTRAP_SERVERS",
-            "kafka:9092"
-        )
+        kafka_bootstrap_servers = settings.KAFKA_BOOTSTRAP_SERVERS
 
         print(
             f"🔌 AI Kafka Producer connecting to: {kafka_bootstrap_servers}",
