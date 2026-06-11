@@ -10,6 +10,6 @@ Build and run:
 
 docker build -t oracle-java-bot-ai-service:latest .
 docker rm -f oracle-java-bot-ai-service
-docker run --network oracle-java-bot-backend_broker-kafka --name oracle-java-bot-ai-service -p 8090:8090 --env-file .env oracle-java-bot-ai-service:latest
+docker run --network oracle-java-bot-backend_broker-kafka --name oracle-java-bot-ai-service -p 8090:8090 --env-file .env -e KAFKA_BOOTSTRAP_SERVERS=kafka:29092 oracle-java-bot-ai-service:latest
 
 - [User Guide](USER_GUIDE.md)

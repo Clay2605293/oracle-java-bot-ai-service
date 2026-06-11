@@ -6,7 +6,11 @@ from openai import OpenAI
 from app.core.config import settings
 from app.models.response_models import GeneratedTask, DuplicateCandidate
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+client = OpenAI(
+    api_key=settings.OPENAI_API_KEY,
+    timeout=60.0,
+    max_retries=1
+)
 
 TASK_GENERATION_SYSTEM_PROMPT_PATH = (
     Path(__file__).resolve().parent.parent
@@ -25,7 +29,8 @@ DUPLICATE_DETECTION_SYSTEM_PROMPT = DUPLICATE_DETECTION_SYSTEM_PROMPT_PATH.read_
     encoding="utf-8"
 ).strip()
 
-MAX_CONTENT_CHARS = 6000
+MAX_CONTENT_CHARS = 10000
+MAX_TASK_GENERATION_TOKENS = 6000
 MAX_TASK_DESCRIPTION_CHARS = 350
 
 
@@ -38,17 +43,17 @@ def generate_tasks_with_openai(
 
     user_prompt = build_user_prompt(truncated, normalized_max_hours)
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.3,
-        max_completion_tokens=16384
-    )
+    try:
+        response = create_task_generation_completion(user_prompt)
+    except Exception as e:
+        print(
+            f"❌ OpenAI task generation request failed: "
+            f"{type(e).__name__}: {e}",
+            flush=True
+        )
+        return []
 
-    raw = response.choices[0].message.content.strip()
+    raw = (response.choices[0].message.content or "").strip()
     raw = clean_json_response(raw)
 
     print(f"🔍 OpenAI raw response (first 200 chars): {raw[:200]}", flush=True)
@@ -64,14 +69,28 @@ def generate_tasks_with_openai(
         print(f"❌ Full raw response: {raw}", flush=True)
         return []
 
+    data = extract_tasks_payload(data)
+
+    if not isinstance(data, list):
+        print("❌ Task generation response did not include a tasks array", flush=True)
+        print(f"❌ Full raw response: {raw}", flush=True)
+        return []
+
     tasks = []
+
     for t in data:
         if not isinstance(t, dict):
             continue
 
+        titulo = str(t.get("titulo", "Sin título")).strip()
+        descripcion = str(t.get("descripcion", "")).strip()
+
+        if not titulo:
+            continue
+
         tasks.append(GeneratedTask(
-            titulo=str(t.get("titulo", "Sin título"))[:120],
-            descripcion=str(t.get("descripcion", ""))[:500],
+            titulo=titulo[:120],
+            descripcion=descripcion[:500],
             tiempoEstimado=parse_tiempo_estimado(t.get("tiempoEstimado"))
         ))
 
@@ -88,6 +107,13 @@ def generate_tasks_with_openai(
         + (f". Max hours per task: {normalized_max_hours}" if normalized_max_hours else ""),
         flush=True
     )
+
+    if len(tasks) < 24:
+        print(
+            f"⚠️ Warning: generated only {len(tasks)} tasks. "
+            "The backlog may still be too aggregated for Sprint 1 granularity.",
+            flush=True
+        )
 
     return tasks
 
@@ -172,25 +198,51 @@ def detect_duplicate_tasks_with_openai(
     return duplicates
 
 
+def create_task_generation_completion(user_prompt: str):
+    request = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.1,
+        "max_completion_tokens": MAX_TASK_GENERATION_TOKENS,
+        "response_format": {"type": "json_object"}
+    }
+
+    try:
+        return client.chat.completions.create(**request)
+    except Exception as e:
+        if "response_format" not in str(e):
+            raise
+
+        print(
+            "⚠️ OpenAI JSON response_format was rejected; retrying without it",
+            flush=True
+        )
+        request.pop("response_format")
+        return client.chat.completions.create(**request)
+
+
 def build_user_prompt(content: str, max_hours: Optional[float]) -> str:
     if max_hours is None:
         return (
-            "Genera tareas de backlog para este proyecto.\n\n"
-            "Prioriza tareas pequeñas, accionables, verificables y sin duplicados.\n\n"
+            "Genera tareas de backlog técnico para este proyecto.\n\n"
+            "Restricción de estimación:\n"
+            "- Estima normalmente entre 1.0 y 2.5 horas por tarea.\n"
+            "- Ninguna tarea debe sentirse como una épica.\n\n"
             f"Documento del proyecto:\n\n{content}"
         )
 
     return (
-        f"Genera tareas de backlog para este proyecto.\n\n"
-        f"Restricción obligatoria:\n"
+        "Genera tareas de backlog técnico para este proyecto.\n\n"
+        "Restricción obligatoria de estimación:\n"
         f"- maxHours representa el máximo de horas permitido por tarea individual.\n"
         f"- Ninguna tarea generada puede tener tiempoEstimado mayor a {max_hours} horas.\n"
         f"- NO interpretes {max_hours} como el total de horas del backlog.\n"
         f"- NO limites la suma total de horas de todas las tareas.\n"
         f"- Si una actividad requiere más de {max_hours} horas, divídela en varias tareas más pequeñas.\n"
-        f"- Prefiere granularidad alta: tareas de 1 a {max_hours} horas, accionables y verificables.\n"
-        f"- Genera más tareas si eso permite representar mejor el trabajo del documento.\n"
-        f"- Evita tareas duplicadas o demasiado similares.\n\n"
+        f"- Prefiere tareas de 1.0 a {max_hours} horas.\n\n"
         f"Documento del proyecto:\n\n{content}"
     )
 
@@ -232,6 +284,8 @@ def compact_duplicate_detection_tasks(tasks: list[dict]) -> list[dict]:
 
 
 def clean_json_response(raw: str) -> str:
+    raw = raw.strip()
+
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
@@ -239,6 +293,18 @@ def clean_json_response(raw: str) -> str:
         raw = raw.strip()
 
     return raw
+
+
+def extract_tasks_payload(data):
+    if isinstance(data, list):
+        return data
+
+    if isinstance(data, dict):
+        tasks = data.get("tasks")
+        if isinstance(tasks, list):
+            return tasks
+
+    return data
 
 
 def normalize_max_hours(max_hours: Optional[float]) -> Optional[float]:
